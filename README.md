@@ -10,7 +10,7 @@
             "type": "PowerShell",
             "request": "launch",
             "script": "${workspaceFolder}/src/BittrexBotTrader.ps1",
-            "args":["-ApiKey 'xxx' -ApiSecret 'xxx'"],
+            "args":["-ApiKey 'xxx' -ApiSecret 'xxx' -MinCycleDuration 10"],
             "cwd": "${workspaceFolder}"
         }
     ]

@@ -5,34 +5,84 @@
 
 #>
 
-Param (
+#region Param
 
-    [Parameter(Mandatory=$true)]
-    [String] $ApiKey,
+    Param (
 
-    [Parameter(Mandatory=$true)]
-    [String] $ApiSecret
+        [Parameter(Mandatory=$true, HelpMessage="Your Bittrex API key.")]
+        [String] $ApiKey,
 
-)
+        [Parameter(Mandatory=$true, HelpMessage="Your Bittrex API key.")]
+        [String] $ApiSecret,
+
+        [Parameter(Mandatory=$true, HelpMessage="The Bittrex Market to trade.")]
+        [ValidateSet("BTC-ETH","BTC-LTC")]
+        [String] $Market,
+
+        [Parameter(Mandatory=$true, HelpMessage="The minium duration between cycle starts to ensure the script doesn't run too quickly!")]
+        [Int] $MinCycleDuration
+
+    )
+
+#endregion
+
+
+#region Import Modules
+
+    Import-Module "$($PSScriptRoot)\BittrexApiWrapper.psm1"
+
+#endregion
+
+
+#region Settings
+
+    [String] $SessionUid = Get-Date -Format "yyyy-MM-dd-HH-mm-ss"
+    [Bool] $Continue = $true
+
+#endregion
+
+
+##region Main
     
-Import-Module "./src/BittrexApiWrapper.psm1"
+    $Log = @()
 
-$MinCycleDuration = 10
-$Continue = $true
+    Do {
 
-Do {
+        $LogItem = New-Object -TypeName PSObject
 
-    [DateTime] $CycleStart = Get-Date
+        # Log CycleStart
+        [DateTime] $CycleStart = Get-Date
+        $LogItem | Add-Member -MemberType NoteProperty -TypeName [DateTime] -Name "CycleStart" -Value $CycleStart
 
-    # Insert Trading Logic Here...
 
-    [DateTime] $CycleEnd = Get-Date
-    [TimeSpan] $CycleDuration = New-TimeSpan -Start $CycleStart -End $CycleEnd
-    if ($CycleDuration.TotalSeconds -lt $MinCycleDuration) {
+        #region Trading Logic
 
-        $SleepSeconds = $MinCycleDuration - $CycleDuration.TotalSeconds
-        Start-Sleep -Seconds $SleepSeconds
+            # Insert Trading Magic Here!
+            Write-Host $LogItem.CycleStart
 
-    }
+        #endregion
 
-} until ($Continue -eq $false)
+
+        # Log CycleEnd
+        [DateTime] $CycleEnd = Get-Date
+        $LogItem | Add-Member -MemberType NoteProperty -TypeName [DateTime] -Name "CycleEnd" -Value $CycleEnd
+
+        # Wait
+        [TimeSpan] $CycleDuration = New-TimeSpan -Start $CycleStart -End $CycleEnd
+        if ($CycleDuration.TotalSeconds -lt $MinCycleDuration) {
+
+            $WaitSeconds = $MinCycleDuration - $CycleDuration.TotalSeconds
+            $LogItem | Add-Member -MemberType NoteProperty -TypeName [DateTime] -Name "WaitSeconds" -Value $WaitSeconds
+            Start-Sleep -Seconds $WaitSeconds
+
+        }
+
+        # Save Log
+        $LastLogItem = $LogItem
+        $Log += $LogItem
+
+    } until ($Continue -eq $false)
+
+    $Log | Export-Csv -Path "$($PSScriptRoot)\Logs\BittrexBottrader-$($SessionUid).csv" -NoTypeInformation
+
+#endregion
