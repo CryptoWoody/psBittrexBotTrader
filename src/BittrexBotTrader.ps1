@@ -40,7 +40,7 @@
 
     [Int] $EMAShortCount = 8
     [Int] $EMALongCount = 21
-    [Int] $EMADiffIncreaseTriggerCount = 1
+    [Int] $EMADiffIncreaseTriggerCount = 3
 
     [Int] $EMADiffIncreaseCount = 0
     [Int] $CycleCount = 0
@@ -58,6 +58,8 @@
 
     $LastLogItem = New-Object -TypeName PSObject
 
+    $MarketInfo = Get-BittrexMarkets | Where-Object {$_.MarketName -eq $Market}
+
     Do {
 
         $LogItem = New-Object -TypeName PSObject
@@ -71,6 +73,19 @@
 
         #region Trading Logic
             
+            # Get Balances
+            $BaseCurrenyBalance = Get-BittrexBalance -ApiKey $ApiKey -ApiSecret $ApiSecret -Currency $MarketInfo.BaseCurrency
+            $LogItem | Add-Member -MemberType NoteProperty -TypeName [Object] -Name "BaseCurrenyBalance" -Value $BaseCurrenyBalance.Balance
+            
+            $MarketCurrencyBalance = Get-BittrexBalance -ApiKey $ApiKey -ApiSecret $ApiSecret -Currency $MarketInfo.MarketCurrency
+            $LogItem | Add-Member -MemberType NoteProperty -TypeName [Object] -Name "MarketCurrencyBalance" -Value $MarketCurrencyBalance.Balance
+        
+            # Get Ticker
+            $MarketTicker = Get-BittrexTicker -Market $Market
+            $LogItem | Add-Member -MemberType NoteProperty -TypeName [Object] -Name "Bid" -Value $MarketTicker.Bid
+            $LogItem | Add-Member -MemberType NoteProperty -TypeName [Object] -Name "Ask" -Value $MarketTicker.Ask
+            $LogItem | Add-Member -MemberType NoteProperty -TypeName [Object] -Name "Last" -Value $MarketTicker.Last
+        
             # Get Market History
             $MarketHistory = Get-BittrexMarketHistory -Market $Market | Where-Object {$_.OrderType -eq "SELL"}
             $LogItem | Add-Member -MemberType NoteProperty -TypeName [Object] -Name "MarketHistory" -Value $MarketHistory
@@ -88,14 +103,20 @@
             $LogItem | Add-Member -MemberType NoteProperty -TypeName [Decimal] -Name "EMADiff" -Value $EMADiff
 
             # Compare EMADiff to $LastLogItem.EMADiff
-            if ($EMADiff -gt $LastLogItem.EMADiff -and $CycleCount -gt 1) {
+            if ($CycleCount -gt 1) {
+                if ($EMADiff -gt $LastLogItem.EMADiff -and $EMADiff -gt 0) {
 
-                ++$EMADiffIncreaseCount
-
-            } elseif ($EMADiff -lt $LastLogItem.EMADiff -and $EMADiffIncreaseCount -gt 0 -and $CycleCount -gt 1) {
-
-                --$EMADiffIncreaseCount
-
+                    ++$EMADiffIncreaseCount
+    
+                } elseif ($EMADiff -lt $LastLogItem.EMADiff -and $EMADiffIncreaseCount -gt 0) {
+    
+                    --$EMADiffIncreaseCount
+    
+                } elseif ($EMADiff -lt 0 -and $EMADiffIncreaseCount -gt 0) {
+    
+                    --$EMADiffIncreaseCount
+    
+                }
             }
             $LogItem | Add-Member -MemberType NoteProperty -TypeName [Int] -Name "EMADiffIncreaseCount" -Value $EMADiffIncreaseCount
 
@@ -110,9 +131,9 @@
             } elseif ($EMADiffIncreaseCount -ge $EMADiffIncreaseTriggerCount -and $OpenPosition -eq $true) {
 
                 # Hold
-                $Action = "HOLD"
+                $Action = "HODL"
         
-            } elseif ($EMADiffIncreaseCount -lt $EMADiffIncreaseTriggerCount -and $OpenPosition -eq $true) {
+            } elseif ($EMADiffIncreaseCount -lt $EMADiffIncreaseTriggerCount -and $OpenPosition -eq $true -or $EMADiffIncreaseCount -lt $LastLogItem.EMADiffIncreaseCount -and $OpenPosition -eq $true) {
 
                 # Sell
                 $Action = "SELL"
@@ -153,10 +174,11 @@
         $Log += $LogItem
 
         # Output LogItem
-        $LogItem | Select-Object -Property CycleStart, CycleDurationTotalSeconds, CycleEnd, EMALong, EMAShort, EMADiff, EMADiffIncreaseCount, Action
+        $LogItem | Select-Object -Property CycleStart, CycleDurationTotalSeconds, CycleEnd, BaseCurrenyBalance, MarketCurrenyBalance, Bid, Ask, Last, EMALong, EMAShort, EMADiff, EMADiffIncreaseCount, Action
+        $LogItem | Export-Csv -Path "$($PSScriptRoot)\Logs\BittrexBottrader-$($SessionUid).csv" -NoTypeInformation -Append
 
     } until ($Continue -eq $false)
 
-    $Log | Export-Csv -Path "$($PSScriptRoot)\Logs\BittrexBottrader-$($SessionUid).csv" -NoTypeInformation
+    
 
 #endregion
