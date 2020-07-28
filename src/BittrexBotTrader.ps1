@@ -133,7 +133,7 @@
                 # Hold
                 $Action = "HODL"
         
-            } elseif ($EMADiffIncreaseCount -lt $EMADiffIncreaseTriggerCount -and $OpenPosition -eq $true -or $EMADiffIncreaseCount -lt $LastLogItem.EMADiffIncreaseCount -and $OpenPosition -eq $true) {
+            } elseif ($EMADiffIncreaseCount -lt $LastLogItem.EMADiffIncreaseCount -and $OpenPosition -eq $true) {
 
                 # Sell
                 $Action = "SELL"
