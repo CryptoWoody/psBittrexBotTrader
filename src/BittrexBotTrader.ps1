@@ -20,7 +20,19 @@
         [String] $Market,
 
         [Parameter(Mandatory=$true, HelpMessage="The minium duration between cycle starts to ensure the script doesn't run too quickly!")]
-        [Int] $MinCycleDuration
+        [Int] $MinCycleDuration,
+
+        [Parameter(Mandatory=$true, HelpMessage="The number of prices to include in the average to get the short EMA.")]
+        [Int] $EMAShortCount,
+
+        [Parameter(Mandatory=$true, HelpMessage="The number of prices to include in the average to get the long EMA.")]
+        [Int] $EMALongCount,
+
+        [Parameter(Mandatory=$true, HelpMessage="The number of EMADiff increases to trigger a buy.")]
+        [Int] $EMADiffBuyTrigger,
+
+        [Parameter(Mandatory=$true, HelpMessage="The number of EMADiff decreases to trigger a sell.")]
+        [Int] $EMADiffSellTrigger
 
     )
 
@@ -36,13 +48,11 @@
 
 #region Settings
 
+    [Int] $BittrexBotTraderVersion = 0
+
     [String] $SessionUid = Get-Date -Format "yyyy-MM-dd-HH-mm-ss"
 
-    [Int] $EMAShortCount = 8
-    [Int] $EMALongCount = 21
-    [Int] $EMADiffIncreaseTriggerCount = 3
-
-    [Int] $EMADiffIncreaseCount = 0
+    [Int] $EMADiffProgress = 0
     [Int] $CycleCount = 0
     
     [Bool] $OpenPosition = $false
@@ -59,6 +69,17 @@
     $LastLogItem = New-Object -TypeName PSObject
 
     $MarketInfo = Get-BittrexMarkets | Where-Object {$_.MarketName -eq $Market}
+
+    $SessionConfig = New-Object -TypeName PSObject
+    $SessionConfig | Add-Member -MemberType NoteProperty -TypeName [Int] -Name "BittrexBotTraderVersion" -Value $BittrexBotTraderVersion
+    $SessionConfig | Add-Member -MemberType NoteProperty -TypeName [String] -Name "Market" -Value $Market
+    $SessionConfig | Add-Member -MemberType NoteProperty -TypeName [String] -Name "MinCycleDuration" -Value $MinCycleDuration
+    $SessionConfig | Add-Member -MemberType NoteProperty -TypeName [String] -Name "EMAShortCount" -Value $EMAShortCount
+    $SessionConfig | Add-Member -MemberType NoteProperty -TypeName [String] -Name "EMALongCount" -Value $EMALongCount
+    $SessionConfig | Add-Member -MemberType NoteProperty -TypeName [String] -Name "EMADiffBuyTrigger" -Value $EMADiffBuyTrigger
+    $SessionConfig | Add-Member -MemberType NoteProperty -TypeName [String] -Name "EMADiffSellTrigger" -Value $EMADiffSellTrigger
+    $SessionConfig | Add-Member -MemberType NoteProperty -TypeName [Object] -Name "MarketInfo" -Value $MarketInfo
+    $SessionConfig | ConvertTo-JSON | Out-File -FilePath "$($PSScriptRoot)\Logs\BittrexBottrader-$($SessionUid).json" -Force
 
     Do {
 
@@ -102,48 +123,72 @@
             [Decimal] $EMADiff = $EMAShort - $EMALong
             $LogItem | Add-Member -MemberType NoteProperty -TypeName [Decimal] -Name "EMADiff" -Value $EMADiff
 
-            # Compare EMADiff to $LastLogItem.EMADiff
+            # Calculate EMADiffProgress
             if ($CycleCount -gt 1) {
-                if ($EMADiff -gt $LastLogItem.EMADiff -and $EMADiff -gt 0) {
 
-                    ++$EMADiffIncreaseCount
-    
-                } elseif ($EMADiff -lt $LastLogItem.EMADiff -and $EMADiffIncreaseCount -gt 0) {
-    
-                    --$EMADiffIncreaseCount
-    
-                } elseif ($EMADiff -lt 0 -and $EMADiffIncreaseCount -gt 0) {
-    
-                    --$EMADiffIncreaseCount
-    
+                if ($EMADiff -gt $LastLogItem.EMADiff) {
+
+                    # Up
+                    if ($EMADiffProgress -gt 0) {
+
+                        ++$EMADiffProgress
+
+                    } else {
+
+                        $EMADiffProgress = 1
+
+                    }
+
+                } elseif ($EMADiff -lt $LastLogItem.EMADiff) {
+
+                    # Down
+                    if ($EMADiffProgress -lt 0) {
+
+                        --$EMADiffProgress
+
+                    } else {
+
+                        $EMADiffProgress = -1
+
+                    }
+
                 }
             }
-            $LogItem | Add-Member -MemberType NoteProperty -TypeName [Int] -Name "EMADiffIncreaseCount" -Value $EMADiffIncreaseCount
+            $LogItem | Add-Member -MemberType NoteProperty -TypeName [Int] -Name "EMADiffProgress" -Value $EMADiffProgress
 
             # Buy, Sell or Hold
             [String] $Action = $null
-            if ($EMADiffIncreaseCount -ge $EMADiffIncreaseTriggerCount -and $OpenPosition -eq $false) {
+            if ($OpenPosition -eq $false) {
 
-                # Buy
-                $Action = "BUY"
-                $OpenPosition = $true
+                # No Open Position
+                if ($EMADiffProgress -ge $EMADiffBuyTrigger) {
 
-            } elseif ($EMADiffIncreaseCount -ge $EMADiffIncreaseTriggerCount -and $OpenPosition -eq $true) {
+                    # Buy
+                    $Action = "BUY"
+                    $OpenPosition = $true
 
-                # Hold
-                $Action = "HODL"
+                } else {
+
+                    # Hold
+                    $Action = "WAIT"
+
+                }
         
-            } elseif ($EMADiffIncreaseCount -lt $LastLogItem.EMADiffIncreaseCount -and $OpenPosition -eq $true) {
-
-                # Sell
-                $Action = "SELL"
-                $OpenPosition = $false
-
             } else {
 
-                # Wait
-                $Action = "WAIT"
-                $OpenPosition = $false
+                #Open Position
+                if ($EMADiffProgress -le $EMADiffSellTrigger) {
+
+                    # Sell
+                    $Action = "SELL"
+                    $OpenPosition = $false
+
+                } else {
+
+                    # Hold
+                    $Action = "HODL"
+
+                }
 
             }
             $LogItem | Add-Member -MemberType NoteProperty -TypeName [Int] -Name "Action" -Value $Action
@@ -174,7 +219,7 @@
         $Log += $LogItem
 
         # Output LogItem
-        $LogItem | Select-Object -Property CycleStart, CycleDurationTotalSeconds, CycleEnd, BaseCurrenyBalance, MarketCurrenyBalance, Bid, Ask, Last, EMALong, EMAShort, EMADiff, EMADiffIncreaseCount, Action
+        $LogItem | Select-Object -Property CycleStart, CycleDurationTotalSeconds, CycleEnd, BaseCurrenyBalance, MarketCurrenyBalance, Bid, Ask, Last, EMALong, EMAShort, EMADiff, EMADiffProgress, Action
         $LogItem | Export-Csv -Path "$($PSScriptRoot)\Logs\BittrexBottrader-$($SessionUid).csv" -NoTypeInformation -Append
 
     } until ($Continue -eq $false)
