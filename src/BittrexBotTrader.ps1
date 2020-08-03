@@ -170,8 +170,8 @@
                     $OpenPosition = $true
 
                     $Position = New-Object -TypeName PSObject
-                    $Position | Add-Member -MemberType NoteProperty -TypeName [Int] -Name "BuyTime" -Value $CycleStart
-                    $Position | Add-Member -MemberType NoteProperty -TypeName [Int] -Name "BuyPrice" -Value $MarketTicker.Bid
+                    $Position | Add-Member -MemberType NoteProperty -TypeName [DateTime] -Name "BuyTime" -Value $CycleStart
+                    $Position | Add-Member -MemberType NoteProperty -TypeName [Decimal] -Name "BuyPrice" -Value $MarketTicker.Bid
 
                 } else {
 
@@ -189,13 +189,13 @@
                     $Action = "SELL"
                     $OpenPosition = $false
 
-                    $Position | Add-Member -MemberType NoteProperty -TypeName [Int] -Name "SellTime" -Value $CycleStart
-                    $Position | Add-Member -MemberType NoteProperty -TypeName [Int] -Name "SellPrice" -Value $MarketTicker.Ask
-                    $Position | Add-Member -MemberType NoteProperty -TypeName [Int] -Name "PriceDiff" -Value ($Position.SellPrice - $Position.BuyPrice)
+                    $Position | Add-Member -MemberType NoteProperty -TypeName [DateTime] -Name "SellTime" -Value $CycleStart
+                    $Position | Add-Member -MemberType NoteProperty -TypeName [Decimal] -Name "SellPrice" -Value $MarketTicker.Ask
+                    $Position | Add-Member -MemberType NoteProperty -TypeName [Decimal] -Name "PriceDiff" -Value ($Position.SellPrice - $Position.BuyPrice)
                     $Positions += $Position
 
                     $Position | Select-Object -Property BuyTime, BuyPrice, SellTime, SellPrice, PriceDiff
-                    $Position | Export-Csv -Path "$($PSScriptRoot)\Logs\BittrexBottrader-Posotions-$($SessionUid).csv" -NoTypeInformation -Append
+                    $Position | Export-Csv -Path "$($PSScriptRoot)\Logs\BittrexBottrader-$($SessionUid)-Positions.csv" -NoTypeInformation -Append
 
                 } else {
 
