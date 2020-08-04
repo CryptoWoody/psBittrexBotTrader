@@ -1,2 +1,3 @@
 .vscode/launch.json
 /src/logs/
+.DS_Store
