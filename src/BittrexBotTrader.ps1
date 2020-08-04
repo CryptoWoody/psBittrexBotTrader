@@ -50,8 +50,8 @@
 
 #region Import Modules
 
-    Import-Module "$($PSScriptRoot)\BittrexApiWrapper.psm1"
-    Import-Module "$($PSScriptRoot)\TelegramApiWrapper.psm1"
+    Import-Module "$($PSScriptRoot)\BittrexApiWrapper.psm1" -Force
+    Import-Module "$($PSScriptRoot)\TelegramApiWrapper.psm1" -Force
 
 #endregion
 
