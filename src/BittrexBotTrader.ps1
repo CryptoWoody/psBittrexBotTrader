@@ -269,4 +269,8 @@
 
 #endregion
 
-Send-TelegramChatMessage -Token "1300460605:AAGdhZlBn4psJ3oIyTn4tYx-jJUkpysjdyk" -ChatId -1001445837326 -Message "Bot Ended!"
+if ($PostToTelegram) {
+
+    Send-TelegramChatMessage -Token $TelegramBotToken -ChatId $TelegramChatId -Message "Bot Ended!"
+
+}
