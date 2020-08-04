@@ -59,9 +59,17 @@ Function Get-BittrexAPIResponse {
 
     [byte[]] $ReturnBytes = $Request.UploadData($Url, "post", [System.Text.Encoding]::ASCII.GetBytes(""))
     [string] $ReturnString = [System.Text.Encoding]::ASCII.GetString($ReturnBytes)
-    [Object] $Return = $ReturnString | ConvertFrom-Json 
-    
-    Return $Return.Result
+    [Object] $Return = $ReturnString | ConvertFrom-Json
+
+    if ($Return.success -ne $true) {
+
+        Write-Error -Message $Return.message
+
+    } else {
+
+        Return $Return.Result
+
+    }
     
 }
 
@@ -77,8 +85,8 @@ $BittrexURLs = @{
     "GetMarketHistory" = "https://api.bittrex.com/api/v1.1/public/getmarkethistory?market={0}"
     
     #Market
-    "BuyLimit" = "https://api.bittrex.com/api/v1.1/market/buylimit?nonce={0}&apikey={1}&market={2}&quantity={3}&rate={4}"
-    "SellLimit" = "https://api.bittrex.com/api/v1.1/market/selllimit?nonce={0}&apikey={1}&market={2}&quantity={3}&rate={4}"
+    "BuyLimit" = "https://api.bittrex.com/api/v1.1/market/buylimit?nonce={0}&apikey={1}&market={2}&quantity={3}&rate={4}&timeInForce={5}"
+    "SellLimit" = "https://api.bittrex.com/api/v1.1/market/selllimit?nonce={0}&apikey={1}&market={2}&quantity={3}&rate={4}&timeInForce={5}"
     "Cancel" = "https://api.bittrex.com/api/v1.1/market/cancel?nonce={0}&apikey={1}&uuid={2}"
     "GetOpenOrders" = "https://api.bittrex.com/api/v1.1/market/getopenorders?nonce={0}&apikey={1}&market={2}"
     
@@ -187,13 +195,15 @@ Function New-BittrexBuyLimitOrder {
         [Parameter(Mandatory=$true)] [String] $Market,
         [Parameter(Mandatory=$true)] [Float] $Quantity,
         [Parameter(Mandatory=$true)] [Float] $Rate,
+        [Parameter(Mandatory=$true)] [String] $TimeInForce,
         [Parameter(Mandatory=$true)] [String] $ApiKey,
         [Parameter(Mandatory=$true)] [String] $ApiSecret
+
 
     )
 
     $Nonce = Get-Nonce
-    $Url = [String]::Format($BittrexURLs.BuyLimit, $Nonce, $ApiKey, $Market, $Quantity, $Rate)
+    $Url = [String]::Format($BittrexURLs.BuyLimit, $Nonce, $ApiKey, $Market, $Quantity, $Rate, $TimeInForce)
     $Return = Get-BittrexAPIResponse -Url $Url -Secure -ApiKey $ApiKey -ApiSecret $ApiSecret -Nonce $Nonce
 
     Return $Return
@@ -208,13 +218,14 @@ Function New-BittrexSellimitOrder {
         [Parameter(Mandatory=$true)] [String] $Market,
         [Parameter(Mandatory=$true)] [Float] $Quantity,
         [Parameter(Mandatory=$true)] [Float] $Rate,
+        [Parameter(Mandatory=$true)] [String] $TimeInForce,
         [Parameter(Mandatory=$true)] [String] $ApiKey,
         [Parameter(Mandatory=$true)] [String] $ApiSecret
 
     )
 
     $Nonce = Get-Nonce
-    $Url = [String]::Format($BittrexURLs.SellLimit, $Nonce, $ApiKey, $Market, $Quantity, $Rate)
+    $Url = [String]::Format($BittrexURLs.SellLimit, $Nonce, $ApiKey, $Market, $Quantity, $Rate, $TimeInForce)
     $Return = Get-BittrexAPIResponse -Url $Url -Secure -ApiKey $ApiKey -ApiSecret $ApiSecret -Nonce $Nonce
 
     Return $Return
