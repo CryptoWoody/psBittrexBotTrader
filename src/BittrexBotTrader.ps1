@@ -32,7 +32,16 @@
         [Int] $EMADiffBuyTrigger,
 
         [Parameter(Mandatory=$true, HelpMessage="The number of EMADiff decreases to trigger a sell.")]
-        [Int] $EMADiffSellTrigger
+        [Int] $EMADiffSellTrigger,
+
+        [Parameter(Mandatory=$false, ParameterSetName="Telegram", HelpMessage="Post status messages to Telegram")]
+        [Switch] $PostToTelegram,
+
+        [Parameter(Mandatory=$false, ParameterSetName="Telegram", HelpMessage="The token of a bot to use to post messages to a Telegram Chat.")]
+        [String] $TelegramBotToken,
+
+        [Parameter(Mandatory=$false, ParameterSetName="Telegram", HelpMessage="The Telegram Chat to post messages to.")]
+        [Long] $TelegramChatId
 
     )
 
@@ -42,6 +51,7 @@
 #region Import Modules
 
     Import-Module "$($PSScriptRoot)\BittrexApiWrapper.psm1"
+    Import-Module "$($PSScriptRoot)\TelegramApiWrapper.psm1"
 
 #endregion
 
@@ -82,6 +92,13 @@
     $SessionConfig | Add-Member -MemberType NoteProperty -TypeName [String] -Name "EMADiffSellTrigger" -Value $EMADiffSellTrigger
     $SessionConfig | Add-Member -MemberType NoteProperty -TypeName [Object] -Name "MarketInfo" -Value $MarketInfo
     $SessionConfig | ConvertTo-JSON | Out-File -FilePath "$($PSScriptRoot)\Logs\BittrexBottrader-$($SessionUid).json" -Force
+
+    if ($PostToTelegram) {
+
+        Send-TelegramChatMessage -Token $TelegramBotToken -ChatId $TelegramChatId -Message "Bot Started!"
+
+    }
+    
 
     Do {
 
@@ -173,6 +190,12 @@
                     $Position | Add-Member -MemberType NoteProperty -TypeName [DateTime] -Name "BuyTime" -Value $CycleStart
                     $Position | Add-Member -MemberType NoteProperty -TypeName [Decimal] -Name "BuyPrice" -Value $MarketTicker.Bid
 
+                    if ($PostToTelegram) {
+
+                        Send-TelegramChatMessage -Token $TelegramBotToken -ChatId $TelegramChatId -Message "Buy @ $($MarketTicker.Bid)"
+                
+                    }
+
                 } else {
 
                     # Hold
@@ -196,6 +219,12 @@
 
                     $Position | Select-Object -Property BuyTime, BuyPrice, SellTime, SellPrice, PriceDiff
                     $Position | Export-Csv -Path "$($PSScriptRoot)\Logs\BittrexBottrader-$($SessionUid)-Positions.csv" -NoTypeInformation -Append
+
+                    if ($PostToTelegram) {
+
+                        Send-TelegramChatMessage -Token $TelegramBotToken -ChatId $TelegramChatId -Message "Sell @ $($MarketTicker.Ask)"
+                
+                    }
 
                 } else {
 
@@ -239,3 +268,5 @@
     } until ($Continue -eq $false)
 
 #endregion
+
+Send-TelegramChatMessage -Token "1300460605:AAGdhZlBn4psJ3oIyTn4tYx-jJUkpysjdyk" -ChatId -1001445837326 -Message "Bot Ended!"
